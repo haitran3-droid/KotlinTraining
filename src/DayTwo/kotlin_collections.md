@@ -3,23 +3,25 @@
 > [!NOTE]
 > Tài liệu tham khảo: [Kotlin Official Docs - Collections](https://kotlinlang.org/docs/collections-overview.html)
 
+**Cách đọc ví dụ:** mỗi đoạn code minh họa riêng một ý; không ghép mọi biến cùng tên thành một file. `sortedSetOf`, `sortedMapOf` và một số thao tác Java Map trong bài dùng cho Kotlin/JVM. Xem thêm [40 câu hỏi và trả lời](kotlin_collections_qa.md).
+
 ---
 
 ## 1. Tổng quan về Collections trong Kotlin
 
 Kotlin cung cấp một hệ thống Collection phong phú, được chia thành **2 nhóm chính**:
 
-| Loại | Mutable (Thay đổi được) | Immutable (Chỉ đọc) |
+| Loại | Mutable (Thay đổi được) | Read-only (Chỉ đọc) |
 |------|--------------------------|----------------------|
 | **List** | `MutableList<T>` | `List<T>` |
 | **Set** | `MutableSet<T>` | `Set<T>` |
 | **Map** | `MutableMap<K, V>` | `Map<K, V>` |
 
 > [!IMPORTANT]
-> Trong Kotlin, **mặc định collection là immutable** (chỉ đọc). Bạn cần dùng `mutableListOf()`, `mutableSetOf()`, `mutableMapOf()` nếu muốn thay đổi nội dung.
+> `List`, `Set`, `Map` là interface **read-only**, không cung cấp API thêm/xóa/cập nhật phần tử. Đây không phải cam kết dữ liệu bất biến: nơi khác giữ tham chiếu mutable vẫn có thể sửa cùng đối tượng. Dùng `mutableListOf()`, `mutableSetOf()`, `mutableMapOf()` khi cần API thay đổi nội dung.
 
 ```kotlin
-// Immutable — không thể add/remove
+// Read-only — không thể gọi add/remove qua interface List
 val names: List<String> = listOf("An", "Bình", "Cường")
 
 // Mutable — có thể add/remove
@@ -31,10 +33,19 @@ mutableNames.add("Cường") // ✅ OK
 
 ## 2. List — Danh sách có thứ tự
 
+`val` chỉ ngăn gán lại biến, không cấm sửa một collection mutable. Ví dụ hai biến có thể tham chiếu cùng danh sách:
+
+```kotlin
+val editable = mutableListOf("An")
+val readable: List<String> = editable
+editable.add("Bình")
+println(readable) // [An, Bình]
+```
+
 ### 2.1. Khởi tạo List
 
 ```kotlin
-// Immutable List
+// Read-only List
 val fruits = listOf("Táo", "Cam", "Xoài")
 val emptyList = emptyList<String>()
 val nonNullList = listOfNotNull("A", null, "B") // → ["A", "B"]
@@ -63,6 +74,8 @@ colors[0]                  // "Đỏ" — có thể ném IndexOutOfBoundsExcepti
 colors.get(1)              // "Xanh"
 colors.first()             // "Đỏ"
 colors.last()              // "Tím"
+colors.firstOrNull()       // "Đỏ" — null nếu list rỗng
+colors.lastOrNull()        // "Tím" — null nếu list rỗng
 colors.getOrNull(99)       // null — an toàn, không ném exception
 colors.getOrElse(99) { "Mặc định" } // "Mặc định"
 
@@ -102,7 +115,7 @@ numbers.sortDescending()     // Sắp xếp giảm dần tại chỗ
 ### 3.1. Khởi tạo Set
 
 ```kotlin
-// Immutable Set
+// Read-only Set
 val uniqueNumbers = setOf(1, 2, 3, 2, 1)  // → {1, 2, 3}
 val emptySet = emptySet<Int>()
 
@@ -112,7 +125,7 @@ val mutableSet = mutableSetOf("A", "B", "C")
 // LinkedHashSet — giữ thứ tự chèn
 val linkedSet = linkedSetOf("X", "Y", "Z")
 
-// HashSet — không đảm bảo thứ tự, hiệu suất cao
+// HashSet — không đảm bảo thứ tự; tra cứu trung bình O(1)
 val hashSet = hashSetOf(3, 1, 2)
 
 // TreeSet (SortedSet) — tự động sắp xếp
@@ -144,8 +157,10 @@ setA subtract setB       // {1, 2}
 > [!TIP]
 > **Khi nào dùng Set thay vì List?**
 > - Khi cần **loại bỏ phần tử trùng lặp**
-> - Khi cần kiểm tra **phần tử tồn tại** với hiệu suất cao (`contains()` là O(1) với HashSet)
+> - Khi cần kiểm tra **phần tử tồn tại** thường xuyên (`contains()` trung bình O(1) với HashSet; không phải bảo đảm cho mọi Set)
 > - Khi cần thực hiện **phép toán tập hợp** (union, intersect, subtract)
+
+Với HashSet/LinkedHashSet, phần tử trùng dựa trên `equals()` và `hashCode()`. Hai data class có cùng ID nhưng thuộc tính khác vẫn có thể là hai phần tử khác nhau. SortedSet xác định trùng theo comparator/thứ tự so sánh. Đừng sửa thuộc tính tham gia `equals/hashCode` của một object khi nó đang được dùng trong hash set hoặc làm key của hash map.
 
 ---
 
@@ -154,7 +169,7 @@ setA subtract setB       // {1, 2}
 ### 4.1. Khởi tạo Map
 
 ```kotlin
-// Immutable Map
+// Read-only Map
 val capitals = mapOf(
     "VN" to "Hà Nội",
     "JP" to "Tokyo",
@@ -200,7 +215,7 @@ users.containsValue("An")       // true
 // Thêm / Cập nhật
 users["u4"] = "Dũng"            // Thêm mới
 users["u1"] = "An Updated"      // Cập nhật
-users.putIfAbsent("u1", "X")    // Chỉ thêm nếu key chưa tồn tại
+users.putIfAbsent("u1", "X")    // Thêm nếu key chưa có hoặc đang ánh xạ tới null
 
 // Xóa
 users.remove("u3")              // Xóa theo key
@@ -218,6 +233,8 @@ users.entries // Set<Map.Entry<String, String>>
 ```
 
 ---
+
+**Map và null:** key là duy nhất, value có thể trùng. Với `Map<K, V?>`, `map[key] == null` có thể là key không tồn tại hoặc value đang là null; dùng `containsKey` để phân biệt. `getOrElse` dùng fallback khi kết quả đọc là null, còn `getOrDefault` dùng mặc định khi key không tồn tại.
 
 ## 5. Transformation Functions — Hàm biến đổi
 
@@ -250,6 +267,8 @@ val result = numbers.mapIndexedNotNull { index, value ->
 > - Khi cần **chuyển đổi kiểu dữ liệu** (ví dụ: `Entity` → `DTO`, `Model` → `UIState`)
 > - Khi cần **tính toán trên từng phần tử** mà không thay đổi collection gốc
 > - Dùng `mapNotNull` khi kết quả biến đổi **có thể null** và muốn bỏ qua null
+
+`map` tạo danh sách kết quả nhưng không sao chép sâu phần tử, cũng không ngăn lambda sửa object nguồn. Muốn giữ dữ liệu cũ để so sánh, tạo object mới thay vì sửa trực tiếp object cũ.
 
 ### 5.2. `flatMap` — Gộp danh sách lồng nhau
 
@@ -308,6 +327,8 @@ val idToName = users.associate { it.id to it.name }
 // {1="An", 2="Bình", 3="Cường"}
 ```
 
+**Key trùng:** các hàm `associate*` giữ value của phần tử cuối cho mỗi key. Nếu cần giữ tất cả phần tử trong cùng nhóm, dùng `groupBy`.
+
 ### 5.5. `groupBy` — Nhóm phần tử theo điều kiện
 
 ```kotlin
@@ -353,6 +374,8 @@ val (nameList, ageList) = pairs.unzip()
 // ageList = [25, 30, 28]
 ```
 
+Nếu hai nguồn khác độ dài, `zip` chỉ tạo số cặp bằng nguồn ngắn hơn; phần dư bị bỏ khỏi kết quả.
+
 ### 5.7. `chunked` & `windowed` — Chia nhóm
 
 ```kotlin
@@ -380,6 +403,8 @@ numbers.zipWithNext()
 ```
 
 ---
+
+`chunked` giữ nhóm cuối dù thiếu phần tử. `windowed` mặc định bỏ cửa sổ thiếu phần tử; dùng `partialWindows = true` nếu muốn giữ chúng.
 
 ## 6. Filtering Functions — Hàm lọc
 
@@ -521,7 +546,7 @@ emptyList<Int>().none()        // true (list rỗng)
 ```
 
 > [!WARNING]
-> **Chú ý:** `all` trả về `true` cho collection rỗng (vacuous truth). Luôn kiểm tra `isNotEmpty()` trước nếu cần logic chính xác.
+> **Chú ý:** `all` trả về `true` cho collection rỗng. Chỉ thêm `isNotEmpty()` nếu yêu cầu nghiệp vụ cần ít nhất một phần tử, ví dụ “có học sinh và tất cả đều đậu”. Đây là hành vi đúng của API, không phải lỗi.
 > ```kotlin
 > emptyList<Int>().all { it > 100 } // true! (vacuous truth)
 > ```
@@ -559,6 +584,8 @@ val cheapest = products.minByOrNull { it.price } // Mouse(25)
 val mostExpensive = products.maxByOrNull { it.price } // Laptop(1500)
 ```
 
+Với collection số rỗng, `sum()` trả 0, `average()` trả `NaN`; `min()/max()` ném exception, còn `minOrNull()/maxOrNull()` trả null. Các hàm `minByOrNull/maxByOrNull` trả object phần tử, không phải riêng giá trị tiêu chí.
+
 ### 8.2. `reduce` & `fold` — Tích lũy giá trị
 
 ```kotlin
@@ -591,7 +618,7 @@ val runningProducts = numbers.runningReduce { acc, value -> acc * value }
 
 > [!TIP]
 > **`reduce` vs `fold`:**
-> - `reduce`: Dùng khi kiểu kết quả **giống kiểu phần tử**. Ném exception nếu list rỗng.
+> - `reduce`: Bắt đầu tích lũy từ phần tử đầu; thường dùng kết quả cùng kiểu phần tử, cũng có thể tích lũy ở một kiểu cha phù hợp. Ném exception nếu list rỗng.
 > - `fold`: Dùng khi cần **giá trị khởi tạo** hoặc kiểu kết quả **khác kiểu phần tử**. An toàn với list rỗng.
 
 ---
@@ -659,6 +686,8 @@ list.toTypedArray()           // Array<Int>
 
 ---
 
+`toList()/toMutableList()` không sao chép sâu các object bên trong. Thay đổi cấu trúc list kết quả không sửa cấu trúc list nguồn, nhưng các object mutable bên trong có thể vẫn được chia sẻ. `toSet()` loại trùng; `pairs.toMap()` giữ value cuối khi key trùng.
+
 ## 11. String Collection Functions — Hàm xử lý chuỗi
 
 ```kotlin
@@ -687,19 +716,19 @@ longList.joinToString(limit = 5, truncated = "...")
 ## 12. Sequence — Xử lý lười (Lazy Evaluation)
 
 ```kotlin
-// Collection: eager — mỗi bước tạo list trung gian
+// Pipeline trên List: eager — filter/map/take ở đây tạo các list kết quả
 val eagerResult = listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
     .filter { it % 2 == 0 }    // Tạo list [2, 4, 6, 8, 10]
     .map { it * it }            // Tạo list [4, 16, 36, 64, 100]
     .take(3)                    // Tạo list [4, 16, 36]
 
-// Sequence: lazy — không tạo list trung gian
+// Pipeline Sequence này: filter/map/take lazy, tránh các list trung gian
 val lazyResult = listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
     .asSequence()               // Chuyển thành Sequence
     .filter { it % 2 == 0 }    // Lazy
     .map { it * it }            // Lazy
     .take(3)                    // Lazy
-    .toList()                   // Terminal operation — thực thi tất cả
+    .toList()                   // Terminal: chạy pipeline đến khi có đủ 3 kết quả
 
 // generateSequence — tạo sequence vô hạn
 val powersOf2 = generateSequence(1) { it * 2 }
@@ -724,10 +753,12 @@ fibonacci.take(10).toList()
 
 > [!IMPORTANT]
 > **Khi nào dùng Sequence thay vì Collection?**
-> - Khi collection có **nhiều phần tử** (> 10,000)
+> - Khi cần giảm các danh sách trung gian trong pipeline nhiều bước; nguồn lớn có thể hưởng lợi nhưng không có ngưỡng cố định bảo đảm nhanh hơn
 > - Khi có **chuỗi nhiều phép biến đổi** (filter → map → take → ...)
 > - Khi chỉ cần **một phần kết quả** (ví dụ: `first()`, `take(n)`)
 > - Khi muốn tránh **tạo nhiều list trung gian** → tiết kiệm bộ nhớ
+
+Sequence có chi phí xử lý lazy, nên không luôn nhanh hơn List. Một số thao tác như `sorted()` vẫn cần giữ dữ liệu trước khi phát kết quả. Sequence không tự chạy background; phép biến đổi nặng trên Main vẫn có thể làm đứng UI. Với nguồn vô hạn, giới hạn số phần tử trước khi gom vào `toList()`.
 
 ---
 
@@ -773,14 +804,15 @@ data class UserUiModel(val id: Int, val displayName: String, val email: String)
 fun mapApiToUi(apiUsers: List<ApiUser>): List<UserUiModel> {
     return apiUsers
         .filter { it.isActive }                      // Chỉ lấy user active
-        .filter { it.email != null }                  // Bỏ user không có email
-        .distinctBy { it.email }                      // Loại trùng email
-        .sortedBy { it.name }                         // Sắp xếp theo tên
-        .map { user ->                                // Chuyển sang UI model
+        .filter { it.email != null }                 // Bỏ user không có email
+        .distinctBy { it.email }                     // Giữ phần tử đầu theo email
+        .sortedBy { it.name }                        // Sắp xếp theo tên gốc
+        .mapNotNull { user ->                         // Bỏ email null và tạo UI model
+            val email = user.email ?: return@mapNotNull null
             UserUiModel(
                 id = user.id,
                 displayName = user.name.uppercase(),
-                email = user.email!!
+                email = email
             )
         }
 }
@@ -809,10 +841,11 @@ fun searchAndPaginate(
     page: Int,
     pageSize: Int = 20
 ): List<String> {
-    return items
-        .filter { it.contains(query, ignoreCase = true) } // Tìm kiếm
-        .drop((page - 1) * pageSize)                       // Bỏ qua trang trước
-        .take(pageSize)                                     // Lấy đúng số lượng
+    require(page >= 1 && pageSize > 0)
+    val start = (page.toLong() - 1) * pageSize // Tránh tràn phép nhân Int
+    val filtered = items.filter { it.contains(query, ignoreCase = true) }
+    if (start >= filtered.size) return emptyList()
+    return filtered.drop(start.toInt()).take(pageSize) // Lấy tối đa pageSize phần tử
 }
 ```
 
@@ -842,4 +875,4 @@ fun getSelectedIds(items: List<Item>): List<Int> {
 > - **List** → Khi cần **thứ tự** và cho phép **trùng lặp**
 > - **Set** → Khi cần **loại bỏ trùng lặp** và kiểm tra tồn tại nhanh
 > - **Map** → Khi cần **tra cứu nhanh** theo key
-> - **Sequence** → Khi xử lý **dữ liệu lớn** với chuỗi biến đổi dài
+> - **Sequence** → Khi pipeline có thể hưởng lợi từ lazy/dừng sớm; đo hiệu năng nếu cần chọn giữa Sequence và List

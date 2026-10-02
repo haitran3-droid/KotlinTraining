@@ -3,6 +3,8 @@
 > [!NOTE]
 > Tài liệu tham khảo: [Kotlin Official Docs - Generics](https://kotlinlang.org/docs/generics.html)
 
+**Cách đọc ví dụ:** mỗi đoạn minh họa một ý, không ghép toàn bộ thành một file. Dòng ghi “không biên dịch” là ví dụ lỗi có chủ ý; `User` là model của ứng dụng. Xem thêm [30 câu hỏi và trả lời](kotlin_generics_qa.md).
+
 ---
 
 ## 1. Khái niệm Generic là gì?
@@ -10,7 +12,7 @@
 **Generic** (kiểu tổng quát) cho phép bạn viết class, interface, hoặc function mà **không cần xác định kiểu dữ liệu cụ thể** ngay lúc khai báo. Kiểu dữ liệu sẽ được chỉ định sau khi sử dụng.
 
 **Tại sao cần Generic?**
-- ✅ **Type Safety** — Compiler kiểm tra kiểu tại compile-time, tránh `ClassCastException` lúc runtime
+- ✅ **Type Safety** — Compiler kiểm tra kiểu tại compile-time, giảm lỗi dùng sai kiểu. Ép kiểu không kiểm tra hoặc dữ liệu từ Java vẫn có thể gây `ClassCastException`.
 - ✅ **Tái sử dụng code** — Viết 1 lần, dùng cho nhiều kiểu dữ liệu
 - ✅ **Loại bỏ ép kiểu thủ công** — Không cần cast khi lấy phần tử ra
 
@@ -43,10 +45,10 @@ class Box<T>(t: T) {
 }
 
 // Tạo instance — chỉ định kiểu rõ ràng
-val box: Box<Int> = Box<Int>(1)
+val explicitBox: Box<Int> = Box<Int>(1)
 
 // Hoặc để compiler tự suy luận (type inference)
-val box = Box(1)  // Compiler hiểu đây là Box<Int>
+val inferredBox = Box(1)  // Compiler hiểu đây là Box<Int>
 ```
 
 ### 2.2 Generic Interface
@@ -59,9 +61,9 @@ interface Repository<T> {
 }
 
 class UserRepository : Repository<User> {
-    override fun getById(id: Int): User { ... }
-    override fun getAll(): List<User> { ... }
-    override fun save(item: User) { ... }
+    override fun getById(id: Int): User = TODO("Tìm user theo id")
+    override fun getAll(): List<User> = TODO("Lấy danh sách user")
+    override fun save(item: User) { TODO("Lưu user") }
 }
 ```
 
@@ -82,8 +84,8 @@ fun <T> T.basicToString(): String {
 
 Gọi hàm generic:
 ```kotlin
-val l = singletonList<Int>(1)   // Chỉ định kiểu rõ ràng
-val l = singletonList(1)        // Type inference — compiler tự hiểu T = Int
+val explicit = singletonList<Int>(1) // Chỉ định kiểu rõ ràng
+val inferred = singletonList(1)      // Type inference — compiler tự hiểu T = Int
 ```
 
 ---
@@ -92,24 +94,24 @@ val l = singletonList(1)        // Type inference — compiler tự hiểu T = I
 
 ### 3.1 Vấn đề: Invariance (Bất biến)
 
-Mặc định, generic trong Kotlin (và Java) là **invariant** — nghĩa là `List<String>` **KHÔNG phải** subtype của `List<Any>`, dù `String` là subtype của `Any`.
+Một kiểu tự khai báo như `Box<T>` không có `in` hoặc `out` là **invariant**: `Box<String>` không phải subtype của `Box<Any>`, dù `String` là subtype của `Any`. Tuy nhiên, **`List` chỉ đọc của Kotlin đã khai báo `out T`**, nên `List<String>` là subtype của `List<Any>`.
 
 ```kotlin
 val strs: List<String> = listOf("a", "b")
-val objs: List<Any> = strs  // ❌ Lỗi nếu List là invariant (mutable)
+val objs: List<Any> = strs  // ✅ Được: List của Kotlin là covariant
 ```
 
-Tại sao? Vì nếu cho phép, ta có thể:
+`MutableList<T>` là invariant vì vừa đọc vừa ghi. Nếu cho phép gán `MutableList<String>` cho `MutableList<Any>`, code có thể thêm `Int` vào danh sách String:
 ```kotlin
 val strs: MutableList<String> = mutableListOf("a")
-val objs: MutableList<Any> = strs  // Giả sử được phép
-objs.add(42)                        // Thêm Int vào list String!
-val s: String = strs[1]             // 💥 ClassCastException!
+// val objs: MutableList<Any> = strs // ❌ Compiler không cho phép
+// objs.add(42)                     // Nếu được phép, sẽ thêm Int vào list String
+// val s: String = strs[1]          // Khi đó đọc String có thể gây ClassCastException
 ```
 
 ### 3.2 `out` — Covariance (Hiệp biến) — **Producer**
 
-> **Quy tắc:** `T` chỉ được dùng ở vị trí **output** (trả về), KHÔNG được dùng làm input.
+> **Quy tắc:** `T` được dùng ở vị trí **out** trong API. Với method đơn giản, có thể trả trực tiếp `T`, không thể nhận trực tiếp `T` làm tham số công khai. Các kiểu hàm lồng nhau có quy tắc vị trí chi tiết hơn.
 
 ```kotlin
 interface Source<out T> {
@@ -132,7 +134,7 @@ fun demo(strs: Source<String>) {
 
 ### 3.3 `in` — Contravariance (Nghịch biến) — **Consumer**
 
-> **Quy tắc:** `T` chỉ được dùng ở vị trí **input** (tham số), KHÔNG được dùng làm output.
+> **Quy tắc:** `T` được dùng ở vị trí **in** trong API. Với method đơn giản, có thể nhận trực tiếp `T` làm tham số, không thể trả trực tiếp `T` ra ngoài.
 
 ```kotlin
 interface Comparable<in T> {
@@ -162,7 +164,7 @@ fun demo(x: Comparable<Number>) {
 
 > [!TIP]
 > Quy tắc vàng: **Consumer `in`, Producer `out`!** (CIPO)
-> Tương đương với PECS trong Java: Producer-Extends, Consumer-Super.
+> Tương ứng về ý tưởng với PECS trong Java: Producer-Extends, Consumer-Super. `in/out` điều khiển an toàn kiểu, không đảm bảo đối tượng bất biến.
 
 ---
 
@@ -170,17 +172,12 @@ fun demo(x: Comparable<Number>) {
 
 Khi một class **không thể** khai báo `out` hay `in` ở declaration-site (vì dùng `T` ở cả 2 vị trí), ta dùng **type projection** tại nơi sử dụng:
 
-```kotlin
-// Array<T> vừa đọc vừa ghi → không thể dùng out/in ở declaration-site
-class Array<T>(val size: Int) {
-    operator fun get(index: Int): T { ... }
-    operator fun set(index: Int, value: T) { ... }
-}
-```
+`Array<T>` có sẵn trong Kotlin vừa đọc bằng `array[index]`, vừa ghi bằng `array[index] = value`, nên tham số kiểu của nó là invariant. Không cần tự khai báo lại class `Array`.
 
-### `out` projection — Chỉ cho phép đọc:
+### `out` projection — Đọc phần tử, không gán phần tử:
 ```kotlin
 fun copy(from: Array<out Any>, to: Array<Any>) {
+    require(to.size >= from.size) // Đích phải đủ chỗ
     for (i in from.indices)
         to[i] = from[i]  // Đọc từ 'from' OK, ghi vào 'to' OK
 }
@@ -190,11 +187,12 @@ val any = Array<Any>(3) { "" }
 copy(ints, any)  // ✅ OK! Array<Int> match được Array<out Any>
 ```
 
-### `in` projection — Chỉ cho phép ghi:
+### `in` projection — Ghi đúng kiểu, đọc ở mức kiểu cha:
 ```kotlin
 fun fill(dest: Array<in String>, value: String) {
-    // Có thể ghi String vào dest
-    // Nhưng đọc ra chỉ được Any?
+    for (i in dest.indices) dest[i] = value // Ghi String được
+    val first: Any? = dest.firstOrNull()    // Đọc được, nhưng chỉ biết là Any?
+    println(first)
 }
 ```
 
@@ -205,7 +203,7 @@ fun fill(dest: Array<in String>, value: String) {
 Khi bạn **không biết** hoặc **không quan tâm** type argument cụ thể:
 
 ```kotlin
-val list: List<*>  // Tương tự Java raw type, nhưng an toàn hơn
+val list: List<*> = listOf("An", 1) // Không biết kiểu phần tử cụ thể
 ```
 
 | Khai báo | `Foo<*>` tương đương |
@@ -223,6 +221,8 @@ if (something is List<*>) {
 
 ---
 
+`*` không có nghĩa là mọi thao tác đều bị cấm: với `MutableList<*>`, không thêm được phần tử (kể cả null), nhưng vẫn gọi được `clear()` vì hàm này không đưa một giá trị `T` vào danh sách.
+
 ## 6. Generic Constraints — Giới hạn kiểu
 
 ### 6.1 Upper Bound (Giới hạn trên)
@@ -230,13 +230,15 @@ if (something is List<*>) {
 Dùng dấu `:` để chỉ định `T` phải là subtype của một kiểu nào đó:
 
 ```kotlin
-fun <T : Comparable<T>> sort(list: List<T>) { ... }
+fun <T : Comparable<T>> sort(list: List<T>): List<T> = list.sorted()
 
 sort(listOf(1, 2, 3))          // ✅ OK — Int implements Comparable<Int>
-sort(listOf(HashMap<Int, String>())) // ❌ Error — HashMap không implement Comparable
+// sort(listOf(HashMap<Int, String>())) // ❌ HashMap không implement Comparable
 ```
 
 > Nếu không chỉ định upper bound, mặc định là `Any?`
+
+`T` có thể là kiểu nullable. Dùng `<T : Any>` nếu muốn chỉ chấp nhận kiểu không null.
 
 ### 6.2 Nhiều Upper Bound — `where` clause
 
@@ -256,23 +258,23 @@ fun <T> copyWhenGreater(list: List<T>, threshold: T): List<String>
 ## 7. Type Erasure — Xóa kiểu tại Runtime
 
 > [!WARNING]
-> Giống Java, Kotlin sử dụng **type erasure** — thông tin generic bị xóa tại runtime.
-> `Foo<Bar>` và `Foo<Baz?>` đều trở thành `Foo<*>` lúc runtime.
+> Trên JVM, runtime thường không giữ đủ thông tin type argument để kiểm tra một đối tượng generic như `Foo<Bar>` hay `Foo<Baz?>`; cả hai được nhìn ở mức `Foo<*>`. Compiler vẫn kiểm tra generic khi biên dịch, và từng phần tử vẫn có kiểu runtime riêng.
 
 ### Hệ quả:
 ```kotlin
-// ❌ Không thể kiểm tra type argument tại runtime
-if (list is List<String>) { ... }  // Compile error!
-
-// ✅ Chỉ kiểm tra được star-projection
-if (list is List<*>) { ... }       // OK
+fun inspect(value: Any) {
+    // if (value is List<String>) { } // ❌ Không kiểm tra được type argument này
+    if (value is List<*>) {           // ✅ Kiểm tra được có phải List hay không
+        println(value.size)
+    }
+}
 ```
 
-### Giải pháp: `reified` type parameter (chỉ dùng với `inline` function)
+### Kiểm tra kiểu bằng `reified` (chỉ dùng với `inline` function)
 
 ```kotlin
-inline fun <reified T> isOfType(value: Any): Boolean {
-    return value is T  // ✅ OK nhờ reified — T được giữ lại tại runtime
+inline fun <reified T> isOfType(value: Any?): Boolean {
+    return value is T  // ✅ Kiểu T được đưa vào code tại nơi gọi nhờ inline
 }
 
 println(isOfType<String>("hello"))  // true
@@ -281,16 +283,23 @@ println(isOfType<Int>("hello"))     // false
 
 ---
 
+**Giới hạn của reified:** `isOfType<List<String>>(listOf(1, 2))` có thể trả `true` vì kiểm tra được phần List, không xác nhận từng phần tử là String. Cần kiểm tra phần tử nếu đó là yêu cầu; cast như `as List<String>` không tự biến đổi dữ liệu.
+
 ## 8. Definitely Non-Nullable Types — `T & Any`
 
 Dùng khi interop với Java và cần đảm bảo `T` **không null**:
 
-```kotlin
+```java
 // Java interface
+import org.jetbrains.annotations.NotNull;
+
 public interface Game<T> {
     @NotNull T load(@NotNull T x);
 }
 
+```
+
+```kotlin
 // Kotlin override
 interface ArcadeGame<T1> : Game<T1> {
     override fun load(x: T1 & Any): T1 & Any  // Đảm bảo non-null
@@ -298,6 +307,8 @@ interface ArcadeGame<T1> : Game<T1> {
 ```
 
 ---
+
+`T & Any` biểu diễn giá trị của `T` chắc chắn không null tại vị trí đó, với `T` có upper bound nullable. Khác với `<T : Any>` là ràng buộc toàn bộ type argument không null. Phần này chủ yếu dùng khi làm việc với API Java.
 
 ## 9. Underscore Operator `_` cho Type Arguments
 
@@ -349,7 +360,7 @@ graph TD
     E --> E1["Upper Bound — T : Type"]
     E --> E2["where clause — multiple bounds"]
     
-    F --> F1["reified — giữ kiểu tại runtime"]
+    F --> F1["reified — dùng kiểu cụ thể tại nơi gọi inline"]
     F --> F2["Star projection check"]
 ```
 
